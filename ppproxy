@@ -1,0 +1,80 @@
+#!/bin/bash
+
+set_proxy_ip_port() {
+    local IP=$1
+    local PORT=$2
+
+    echo "Setting proxy to $IP:$PORT ..."
+
+    gsettings set org.gnome.system.proxy mode 'manual'
+
+    gsettings set org.gnome.system.proxy.http host "$IP"
+    gsettings set org.gnome.system.proxy.http port "$PORT"
+
+    gsettings set org.gnome.system.proxy.https host "$IP"
+    gsettings set org.gnome.system.proxy.https port "$PORT"
+
+    gsettings set org.gnome.system.proxy.socks host "$IP"
+    gsettings set org.gnome.system.proxy.socks port "$PORT"
+
+    gsettings set org.gnome.system.proxy.ftp host "$IP"
+    gsettings set org.gnome.system.proxy.ftp port "$PORT"
+
+    echo "Proxy applied successfully."
+}
+
+#set_proxy "http://127.0.0.1:20201 , https://127.0.0.1:20202 , socks://127.0.0.1:20200 , ftp://127.0.0.1:20205"
+set_proxy() {
+    INPUT="$1"
+
+    gsettings set org.gnome.system.proxy mode 'manual'
+
+    # Split by comma
+    IFS=',' read -ra ITEMS <<< "$INPUT"
+
+    for ITEM in "${ITEMS[@]}"; do
+        CLEAN=$(echo "$ITEM" | xargs)         # trim whitespace
+        PROTO=$(echo "$CLEAN" | cut -d: -f1)  # http / https / socks / ftp
+        HOSTPORT=$(echo "$CLEAN" | sed 's/.*:\/\///')  # remove http://
+        IP=$(echo "$HOSTPORT" | cut -d: -f1)
+        PORT=$(echo "$HOSTPORT" | cut -d: -f2)
+
+        echo "Setting $PROTO → $IP:$PORT"
+
+        gsettings set "org.gnome.system.proxy.$PROTO" host "$IP"
+        gsettings set "org.gnome.system.proxy.$PROTO" port "$PORT"
+    done
+
+    echo "Proxy applied successfully."
+}
+
+disable_proxy() {
+    echo "Disabling all system proxies..."
+
+    gsettings set org.gnome.system.proxy mode 'none'
+
+    echo "Proxies disabled."
+}
+
+case "$1" in
+    0)
+        disable_proxy
+        ;;
+    1)
+        set_proxy "http://127.0.0.1:20201 , https://127.0.0.1:20202 , socks://127.0.0.1:20200 , ftp://127.0.0.1:20201"
+        ;;
+    2)
+        set_proxy_ip_port "10.0.10.157" "18080" 
+        ;;
+    3)
+        set_proxy "http://127.0.0.1:20201 , https://127.0.0.1:20202 , socks://127.0.0.1:20200 , ftp://127.0.0.1:20205"
+        ;;
+    *)
+        echo "Usage:"
+        echo "  ppproxy 0   # disable proxy"
+        echo "  ppproxy 1   # use IP1:PORT1"
+        echo "  ppproxy 2   # use IP2:PORT2"
+        echo "  ppproxy 3   # use IP3:PORT3"
+        exit 1
+        ;;
+esac

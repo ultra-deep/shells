@@ -1,0 +1,42 @@
+#!/bin/bash
+
+MESSAGE=$1
+
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+BRANCH_NAME_ARRAY=(${BRANCH_NAME//-/ }) # BRANCH_NAME.split('-')
+ARRAY_SIZE=${#BRANCH_NAME_ARRAY[@]}
+
+if (( ARRAY_SIZE < 2 )) ; then
+  echo "ERROR : branch name is not standard ------------ BRANCH = $BRANCH_NAME"
+  exit
+fi
+
+#if [ -z "$MESSAGE" ]; then # if MESSAGE is empty then
+#        for word in "${BRANCH_NAME_ARRAY[@]}"
+#        do
+#            if [ "$word" != "${BRANCH_NAME_ARRAY[0]}" ]; then
+#                MESSAGE="$MESSAGE $word"
+#            fi
+#        done
+#        MESSAGE="$MESSAGE implemented."
+#fi
+
+taskNumberMessage="#${BRANCH_NAME_ARRAY[0]} PR comments resolved..."
+echo ""
+echo ""
+echo "Branch -----------> $BRANCH_NAME"
+echo ""
+echo "Command ----------> git commit -am \"$taskNumberMessage\""
+echo ""
+#read  -n 1 -p "if every things is OK press [Enter] else any key... " key
+echo ""
+echo ""
+if [ "$key" = "" ]; then
+    git commit -am "$taskNumberMessage"
+    git push origin $BRANCH_NAME
+    echo ""
+    echo "------------------------------------------"
+    echo ""
+else
+    echo "________ Nothing happened! _______"
+fi

@@ -1,0 +1,382 @@
+#!/bin/bash
+RED='\033[1;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;36m'
+YELLOW='\033[1;33m'
+ORANGE='\033[0;33m'
+CYAN='\033[0;36m'
+
+
+NC='\033[0m' # No Color
+
+projectPath=/home/x/AndroidStudioProjects/AndriodTraderApp
+apkRepositoryPath=/home/x/Downloads/Android-Apk
+
+apkVersions=() # production (v1.0.10)
+apk_azure_urls_descriptions=()
+apk_azure_urls=()
+
+find_string () {
+	text=$1
+	searchKey=$2
+	echo ${text#*$searchKey}
+}
+
+find_position_string () {
+	text=$1
+	searchKey=$2
+	substering_from_searchkey_to_end=${text#*$searchKey}
+	echo $(( ${#text} - ${#substering_from_searchkey_to_end} - ${#searchKey} ))
+}
+
+sub_string () {
+	text=$1
+	firstKey=$2
+	secondKey=$3
+	firstPosition=$(find_position_string "$text" "$firstKey")
+	secondPosition=$(find_position_string "$text" "$secondKey")
+	sunstring=${text:$firstPosition:$secondPosition}
+	echo $sunstring
+}
+
+press_any_key_to_continue(){
+	read -p "-------------------- [Press enter to continue...] ------------------------"
+}
+
+print_line(){
+	color=$1
+	echo -e "${color}-----------------------------------------------------------${NC}"
+}
+
+get_app_version_name_with_path () {
+   APP_VRESION_FILE=$1
+   searchKey=$2
+   
+   flavorFile=`cat $APP_VRESION_FILE`
+   find_result=${flavorFile#*"enum class TraderFlavor"} # result = ( val dimension: FlavorDimension, val applicationIdSuffix: String? = null,
+   find_result=${flavorFile#*$searchKey} # result = applicationIdSuffix = ".develop", versionCode = 1, versionName = "1.0.29" ), stag ......
+   position=$(( ${#flavorFile} - ${#find_result} - ${#searchKey} ))
+   POTATION="\""
+   
+   find_result=${find_result#*"versionName"} # result = 1.0.29" ), staging ........   
+   find_result=${find_result#*$POTATION} # result = 1.0.29" ), staging ........
+   
+   next_potation=${find_result#*$POTATION}
+   position_of_next_potation=$(( ${#find_result} - ${#next_potation} - ${#POTATION} ))
+       
+   version=${find_result:0:$position_of_next_potation}
+   
+   echo $version
+}
+
+get_above_version(){
+   appversion_path_1=$1 # 1.0.33
+   appversion_path_2=$2 # 1.0.34
+         
+   IFS='.' 
+   read -r -a splitted1 <<< $appversion_path_1
+   read -r -a splitted2 <<< $appversion_path_2
+   
+   if (( splitted1[0] > splitted2[0] )); then
+   	echo "$appversion1"
+   	exit
+   fi
+   
+    
+   
+  if (( splitted1[0] < splitted2[0] )); then
+   	echo "$appversion2"
+   	exit
+   fi
+   
+   if (( splitted1[1] > splitted2[1] )); then
+      echo "$appversion1"
+      exit
+   fi
+   
+   if (( splitted1[1] < splitted2[1] )); then
+      echo "$appversion2"
+      exit
+   fi
+   
+     if (( splitted1[2] > splitted2[2] )); then
+      echo "$appversion1"
+      exit
+   fi
+   
+   if (( splitted1[2] < splitted2[2] )); then
+      echo "$appversion2"
+      exit
+   fi
+   
+   echo "$appversion1"
+}
+
+get_app_version_name (){
+   APP_VRESION_FILE_1=/home/x/AndroidStudioProjects/AndriodTraderApp/build-logic/convention/src/main/kotlin/ir/charisma/android/trader/TraderFlavor.kt
+   APP_VRESION_FILE_2=/home/x/AndroidStudioProjects/AndriodTraderApp_2/build-logic/convention/src/main/kotlin/ir/charisma/android/trader/TraderFlavor.kt
+   searchKey=$1
+   appversion1=$(get_app_version_name_with_path $APP_VRESION_FILE_1 $searchKey) # 1.0.33
+   appversion2=$(get_app_version_name_with_path $APP_VRESION_FILE_2 $searchKey) # 1.0.34
+   echo $(get_above_version $appversion1 $appversion2)
+}
+
+get_app_version_name_develop () {
+	echo $(get_app_version_name 'develop(')
+}
+
+get_app_version_name_staging () {
+	echo $(get_app_version_name 'staging(')
+}
+
+get_app_version_name_peoduction () {
+	echo $(get_app_version_name 'production(')
+}
+
+move_apk_to_repository() {
+	appVersion=$1 #"1.0.29"
+	envirement=$2 #"production"
+	buildMode=$3 #"debug"
+	apkFileName="app-$envirement-$buildMode.apk"
+	willChangeAPKFileName="trader-$envirement-$buildMode-v$appVersion.apk"
+	apkProjectPath="$projectPath/app/$envirement/$buildMode/$apkFileName"
+	willChangeAPKPath="$apkRepositoryPath/$envirement/$willChangeAPKFileName"
+	
+	if [  -f $willChangeAPKPath ]; then
+		#printf "I ${RED}love${NC} Stack Overflow\n"
+		echo -e  "${ORANGE}Already File exits in APK repository : $willChangeAPKPath${NC}"
+		return
+	fi
+	
+	
+	if [  -f $apkProjectPath ]; then
+    		echo "Renaming apk from  [$apkFileName]  -->  [$willChangeAPKFileName] "
+    		#read -p "Press enter to continue..."
+    		mv "$apkProjectPath" "$willChangeAPKPath" 
+    		echo -e "${GREEN}Moved apk from:  $apkProjectPath${NC}"
+    		echo -e "${GREEN}Moved apk to  :  $willChangeAPKPath${NC}"
+    		apkVersions+=("$envirement (v$appVersion)") # production (v1.0.10)
+    		apk_azure_urls+=("https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/$envirement/$willChangeAPKFileName&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true")
+    		apk_azure_urls_descriptions+=("$envirement    $buildMode     v$appVersion") # production  (debug)  v1.0.12
+    	else
+    	      echo -e  "${ORANGE}File not exist! --> $apkProjectPath${NC}"
+	fi
+}
+
+move_apk_to_repository_develop() {
+	appVersion=$(get_app_version_name_develop)
+	move_apk_to_repository "$appVersion" "develop" "debug"
+	move_apk_to_repository "$appVersion" "develop" "release"
+}
+
+move_apk_to_repository_staging() {
+	appVersion=$(get_app_version_name_staging)
+	move_apk_to_repository "$appVersion" "staging" "debug"
+	move_apk_to_repository "$appVersion" "staging" "release"
+}
+
+move_apk_to_repository_production() {
+	appVersion=$(get_app_version_name_peoduction)
+	move_apk_to_repository "$appVersion" "production" "debug"
+	move_apk_to_repository "$appVersion" "production" "release"
+}
+
+
+move_all_apk_to_repository() {
+	move_apk_to_repository_develop
+	move_apk_to_repository_staging
+	move_apk_to_repository_production
+}
+
+is_correct_app_version_name() {
+	textColor=$1
+	echo -e "${textColor}develop version = ${NC}$(get_app_version_name_develop)"
+	echo -e "${textColor}staging version = ${NC}$(get_app_version_name_staging)"
+	echo -e "${textColor}product version = ${NC}$(get_app_version_name_peoduction)"
+	press_any_key_to_continue
+}
+
+commit_and_push_apks(){
+	# remove duplicate elements in $apkVersions array
+	declare -A apkVersions_removeDuplicates
+ 	for i in "${apkVersions[@]}"; do apkVersions_removeDuplicates["$i"]=1; done
+ 	
+	commitMessage="Added APKs "
+	
+
+	i=0
+	for apkEnvVersion in "${!apkVersions_removeDuplicates[@]}"; do
+		if [[ $i -eq 0 ]]; then
+			commitMessage+="$apkEnvVersion"
+		else
+			commitMessage+=" and $apkEnvVersion"
+		fi
+		((i++))
+	done
+
+	cd "$apkRepositoryPath"
+	git add .
+	git status
+	echo -e "Command ----> git commit -am \"$commitMessage\""
+	press_any_key_to_continue
+	gitcommit "\"$commitMessage\""
+	gitpush_origin_current_branch
+}
+
+fetch_and_switch_repository_branch() {
+	branch=$1
+	if [[ -n "$branch" ]]
+	then
+		cd "$apkRepositoryPath"
+		git pull origin "\"$branch\""
+    		echo "1" # not empty
+	else
+    		echo "0" # empty
+	fi
+}
+
+isExistString(){
+	mainString=$1
+	substring=$2
+	if echo "$mainString" | grep -q "$substring"; then
+	  echo "true";
+	else
+	  echo "false";
+	fi
+}
+
+isExistApkOf(){
+	environment=$1 # production/staging/develop
+	buildType=$2 # example (one of):  dubeug / release=$1 # production/staging/develop @@@@@@
+	for apkUrl in "${apk_azure_urls[@]}"; do # apkUrl = https://azure.charisma.tech/Brokere....
+		if($(isExistString $apkUrl $environment) = "true") then
+			if($(isExistString $apkUrl $buildType) = "true") then
+				echo "true"
+				return
+			fi
+		fi
+	done
+	echo "false"
+}
+
+
+print_apk_url(){ # output : https://azure.charisma.tech/Brokerage/e4553....
+	env=$1 # example (one of) : develop / staging / production
+	buildType=$2 # example (one of):  dubeug / release
+	for apkUrl in "${apk_azure_urls[@]}"; do # apkUrl = https://azure.charisma.tech/Brokere....
+		if($(isExistString $apkUrl $env) = "true") then
+			if($(isExistString $apkUrl $buildType) =  "true") then
+				echo -e "${BLUE}$apkUrl${NC}"
+				return
+			fi
+		fi
+	done
+}
+
+
+
+print_apk_urls_of_production(){
+	if($(isExistApkOf production release) = "true") then
+		echo "Production v$(get_app_version_name_peoduction)"
+		print_apk_url production release
+	fi
+}
+
+print_apk_urls_of_staging(){
+	if($(isExistApkOf staging release) = "true") then
+		echo "Staging v$(get_app_version_name_staging)"
+		print_apk_url staging release
+
+	fi
+}
+
+print_apk_urls_of_develop(){
+	if($(isExistApkOf develop release) = "true") then
+		echo "Develop v$(get_app_version_name_develop)"
+		print_apk_url develop release
+	fi
+}
+
+print_develop_changes_url_if_needs(){
+	if($(isExistApkOf develop) = "true") then
+		echo "Develop: https://azure.charisma.tech/Brokerage/Trader/_wiki/wikis/Trader.wiki/312/Develop"
+	fi
+}
+print_staging_changes_url_if_needs(){
+	if($(isExistApkOf staging) = "true") then
+		echo "Staging: https://azure.charisma.tech/Brokerage/Trader/_wiki/wikis/Trader.wiki/315/Staging"
+	fi
+}
+print_production_changes_url_if_needs(){
+	if($(isExistApkOf production) = "true") then
+		echo "Production: https://azure.charisma.tech/Brokerage/Trader/_wiki/wikis/Trader.wiki/311/Production"
+	fi
+}
+
+print_apk_urls(){
+	echo ""
+	echo ""
+	echo "🚀🚀🚀"
+	echo "سلام به همگی."
+	echo ""
+	echo "نسخه حدید اپلیکیشن تریدر اندروید از طریق آدرسهای زیر قابل دریافت میباشد"
+	
+	echo ""
+	print_apk_urls_of_production
+	echo ""
+	print_apk_urls_of_staging
+	echo ""
+	print_apk_urls_of_develop
+	
+	echo ""
+	echo ""
+	echo "تغییرات:"
+	print_production_changes_url_if_needs
+	print_staging_changes_url_if_needs
+	print_develop_changes_url_if_needs
+	echo ""
+	echo ""
+	تغییرات:
+
+}
+
+
+#############################################################################
+# BASH STARTED
+#############################################################################
+
+
+#echo -e "${BLUE}Pulling the main project${NC}"
+#cd $projectPath
+#git_pull_origin_current_branch
+infoColor=$CYAN
+#a=$()
+#if [[ $a -eq "0" ]] then
+#	echo -e "${RED} ERROR : PASS THE BRANCH NAME IN PARAMETER... ${NC}"
+#	exit
+#fi
+
+	#apk_azure_urls+=("https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/production/trader-production-release-v1.0.18.apk&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true")
+	#apk_azure_urls+=("https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/production/trader-production-debug-v1.0.18.apk&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true")
+	#apk_azure_urls+=("https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/staging/trader-staging-release-v1.0.42.apk&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true")
+	#apk_azure_urls+=("https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/staging/trader-staging-debug-v1.0.42.apk&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true")
+	#apk_azure_urls+=("https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/develop/trader-develop-release-v1.0.50.apk&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true")
+	#apk_azure_urls+=("https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/develop/trader-develop-debug-v1.0.50.apk&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true")
+
+print_line $infoColor
+echo -e "${infoColor}Step 1: Is correct the app versions?${NC}"
+print_line $infoColor
+
+is_correct_app_version_name $infoColor
+
+print_line $infoColor
+echo -e "${infoColor}Step 2: Is correct the app versions?${NC}"
+print_line $infoColor
+move_all_apk_to_repository
+
+print_line $infoColor
+echo -e "${infoColor}Step 3: Commit and push APKs${NC}"
+print_line $infoColor
+commit_and_push_apks
+
+print_apk_urls

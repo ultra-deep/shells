@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+echo ""
+echo "Command ----------> git push origin $BRANCH_NAME"
+echo ""
+echo ""
+if [ "$key" = "" ]; then
+    git pull origin $BRANCH_NAME
+    echo ""
+    echo "------------------------------------------"
+    echo ""
+else
+    echo "________ Nothing happened! _______"
+fi

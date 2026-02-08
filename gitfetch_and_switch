@@ -1,0 +1,9 @@
+#!/bin/bash
+
+
+git fetch origin $1
+git checkout $1
+
+if [[ ! -z "$2" ]]; then # if Second is not Bull
+    git pull origin $1
+fi
