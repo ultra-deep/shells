@@ -1,5 +1,34 @@
 #!/bin/bash
 
+creating_swapfile_service() {
+FULL_PATH_OF_SWAP_FILE=$1
+    # Write the content into the file
+    cat <<EOF > "/etc/systemd/system/swapfile.service"
+[Unit]
+Description=Enable Swapfile
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=$FULL_PATH_OF_SWAP_FILE
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+create_swap_file() {
+file_name=$1
+      # Write the content into the file
+    cat <<EOF > "$file_name"
+fallocate -l 2G /swapfile
+mkswap /swapfile
+chmod 0600 /swapfile
+swapon /swapfile
+EOF
+}
+
 creating_swap () {
 	
     # Name of the file to create
@@ -8,19 +37,16 @@ creating_swap () {
      # Check if the file already exists
   if [[ -e "$file_name" ]]; then
     echo "The swap File '$file_name' already exists!"
-    return 1
+  else
+    create_swap_file $file_name
   fi
-  
-    # Write the content into the file
-    cat <<EOF > "$file_name"
-fallocate -l 2G /swapfile
-mkswap /swapfile
-chmod 0600 /swapfile
-swapon /swapfile
-EOF
-
 	chmod +x $file_name
 	./$file_name
+	
+	FULL_PATH_OF_SWAP_FILE="$(pwd)/$file_name"
+	echo "createing SERVICE swap file : $FULL_PATH_OF_SWAP_FILE"
+	creating_swapfile_service $FULL_PATH_OF_SWAP_FILE
+	systemctl enable swapfile.service
 }
 
 init_firewall() {
@@ -45,7 +71,7 @@ init_firewall() {
 
 
 creating_swap
-init_firewall
+#init_firewall
 
 
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+#bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
