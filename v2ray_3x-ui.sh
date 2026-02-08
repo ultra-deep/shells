@@ -44,8 +44,11 @@ creating_swap () {
 	./$file_name
 	
 	FULL_PATH_OF_SWAP_FILE="$(pwd)/$file_name"
-	echo "createing SERVICE swap file : $FULL_PATH_OF_SWAP_FILE"
+	echo "creating SERVICE swap file : $FULL_PATH_OF_SWAP_FILE"
 	creating_swapfile_service $FULL_PATH_OF_SWAP_FILE
+	
+	# load and make enable service
+	systemctl daemon-reload
 	systemctl enable swapfile.service
 }
 
