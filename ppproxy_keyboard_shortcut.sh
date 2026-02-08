@@ -53,6 +53,7 @@ set_shortcut ppproxy-disable "<Shift><Ctrl>Escape" "ppproxy 0"
 set_shortcut ppproxy-1 "<Shift><Ctrl>1" "ppproxy 1"
 set_shortcut ppproxy-2 "<Shift><Ctrl>2" "ppproxy 2"
 set_shortcut ppproxy-3 "<Shift><Ctrl>3" "ppproxy 3"
+set_shortcut ppproxy-3 "<Shift><Ctrl>4" "ppproxy 4"
 
 
 
