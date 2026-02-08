@@ -31,6 +31,7 @@ init_firewall() {
 	systemctl enable firewalld
 	echo "setup firewall..."
 	firewall-cmd --add-port=443/tcp --permanent
+	firewall-cmd --add-port=80/tcp --permanent
 	firewall-cmd --add-port=8888/tcp --permanent
 	firewall-cmd --add-port=47000/tcp --permanent
 	firewall-cmd --add-port=47001/tcp --permanent
