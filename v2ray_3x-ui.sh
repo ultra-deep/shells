@@ -62,6 +62,7 @@ init_firewall() {
 	firewall-cmd --add-port=443/tcp --permanent
 	firewall-cmd --add-port=80/tcp --permanent
 	firewall-cmd --add-port=8888/tcp --permanent
+	firewall-cmd --add-port=8080/tcp --permanent
 	firewall-cmd --add-port=47000/tcp --permanent
 	firewall-cmd --add-port=47001/tcp --permanent
 	firewall-cmd --add-port=47002/tcp --permanent
@@ -78,3 +79,5 @@ init_firewall
 
 
 bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+
+# bash <(curl -Ls https://raw.githubusercontent.com/ultra-deep/shells/refs/heads/main/v2ray_3x-ui.sh)
