@@ -1,9 +1,13 @@
 #!/bin/bash
 
-#if ! pgrep -x picom >/dev/null; then
-#    picom --daemon
-#    sleep 0.5
-#fi
+## --- Check dependencies and install missing ones ---
+for pkg in wmctrl picom; do
+  if ! command -v "$pkg" >/dev/null 2>&1; then
+    echo "🔧 Installing missing package: $pkg ..."
+    sudo apt update -qq
+    sudo apt install -y "$pkg"
+  fi
+done
 
 # Only start picom if no compositor (optional)
 if ! pgrep -x picom >/dev/null && ! pgrep -x mutter >/dev/null && ! pgrep -x kwin_x11 >/dev/null && ! pgrep -x xfwm4 >/dev/null; then
