@@ -36,27 +36,39 @@ INFO_COLOR=$CYAN
 NC='\033[0m' # No Color
 
 MAIN_CONTENT_TEMPLATE="
-🚀🚀🚀
-سلام به همگی.
+**⠀⠀⠀⠀⢀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠙⢷⣤⣤⣴⣶⣶⣦⣤⣤⡾⠋⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⣼⣿⣿⣉⣹⣿⣿⣿⣿⣏⣉⣿⣿⣧⠀⠀⠀⠀
+⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀
+⣠⣄⠀⢠⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⣤⡄⠀⣠⣄
+⣿⣿⡇⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢸⣿⣿
+⣿⣿⡇⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢸⣿⣿
+⣿⣿⡇⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢸⣿⣿
+⣿⣿⡇⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⢸⣿⣿
+⠻⠟⠁⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠈⠻⠟
+⠀⠀⠀⠀⠉⠉⣿⣿⣿⡏⠉⠉⢹⣿⣿⣿⠉⠉⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⣿⣿⣿⡇⠀⠀⢸⣿⣿⣿⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⣿⣿⣿⡇⠀⠀⢸⣿⣿⣿⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠈⠉⠉⠀⠀⠀⠀⠉⠉⠁⠀**⠀⠀⠀
 
-نسخه جدید اپلیکیشن تریدر اندروید از طریق آدرسهای زیر قابل دریافت میباشد
 
-[**production_release_version**](production_release_url)
 
-[**production_debug_version**](production_debug_url)
+⠀
 
-[**staging_release_version**](staging_release_url)
+Hello everybody....
 
-[**staging_debug_version**](staging_debug_url)
+The latest version of the **Android trader application** can be downloaded from the following addresses:
 
-[**develop_release_version**](develop_release_url)
 
-[**develop_debug_version**](develop_debug_url)
 
-Change Logs:
-[production_change_log_text](production_change_log_url)
-[staging_change_log_text](staging_change_log_url)
-[develop_change_log_text](develop_change_log_url)
+**production_release_version: **   [**Release**](production_release_url)     [**Debug**](production_debug_url)    [Change Logs](production_change_log_url)
+
+**staging_release_version: **    [**Release**](staging_release_url)      [**Debug**](staging_debug_url)    [Change Logs](staging_change_log_url)
+
+**develop_release_version: **    [**Release**](develop_release_url)    [**Release**](develop_debug_url)   [Change Logs](develop_change_log_url)
+
+
 
 @pakan @a.sedaghatipour @a.yaalimadad @m.mostafaei @sh.ranjbar
 "
@@ -184,14 +196,15 @@ get_app_version_name_staging () {
   echo $(get_app_version_name 'staging(')
 }
 
-get_app_version_name_peoduction () {
+get_app_version_name_production () {
   echo $(get_app_version_name 'production(')
 }
 
 get_azure_url(){
-  local environment=$1
-  local apkFileName=$2
-  echo "https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/$environment/$apkFileName&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true"
+  local environment=$1  # production | staging | develop
+  local buildMode=$2    # debug | release
+  local apkFileName=$3  # trader-production-debug-v1.0.55.apk
+  echo "https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/$environment/$buildMode/$apkFileName&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true"
 }
 
 is_exist_build_apk_in_local_storage() {
@@ -206,6 +219,7 @@ is_exist_build_apk_in_local_storage() {
     echo "false"
   fi
 }
+
 move_apk_to_repository() {
   appVersion=$1 #"1.0.29"
   local environment=$2 #"production"
@@ -213,11 +227,11 @@ move_apk_to_repository() {
   local apkFileName="app-$environment-$buildMode.apk"
   local willChangeAPKFileName="trader-$environment-$buildMode-v$appVersion.apk"
   local apkProjectPath="$projectPath/app/$environment/$buildMode/$apkFileName"
-  local willChangeAPKPath="$apkRepositoryPath/$environment/$willChangeAPKFileName"
+  local willChangeAPKPath="$apkRepositoryPath/$environment/$buildMode/$willChangeAPKFileName"
 
   if [  -f "$willChangeAPKPath" ]; then
     echo -e  "${ORANGE}Already File exits in APK repository : $willChangeAPKPath${NC}"
-    apk_azure_urls+=("$(get_azure_url "$environment" "$willChangeAPKPath")")
+    apk_azure_urls+=("$(get_azure_url "$environment" "$buildMode" "$willChangeAPKPath")")
     return
   fi
 
@@ -229,7 +243,7 @@ move_apk_to_repository() {
     echo -e "${GREEN}Moved apk from:  $apkProjectPath${NC}"
     echo -e "${GREEN}Moved apk to  :  $willChangeAPKPath${NC}"
     apkVersions+=("$environment (v$appVersion)") # production (v1.0.10)
-    apk_azure_urls+=("$(get_azure_url "$environment" "$willChangeAPKFileName")")
+    apk_azure_urls+=("$(get_azure_url "$environment" "$buildMode" "$willChangeAPKFileName")")
   else
     echo -e  "${BRIGHT_BLACK}File not exist! --> $apkProjectPath${NC}"
   fi
@@ -494,11 +508,11 @@ get_release_description_and_url_if_exist(){
     description="${description/$key_change_log_text/$change_log_text}"
     description="${description/$key_change_log_url/$change_log_url}"
 
-  else
-    description=$(delete_line_if_contain_string "$description" "$key_version")
-    description=$(delete_line_if_contain_string "$description" "$key_url")
-    description=$(delete_line_if_contain_string "$description" "$key_change_log_text")
-    description=$(delete_line_if_contain_string "$description" "$key_change_log_url")
+#  else
+#    description=$(delete_line_if_contain_string "$description" "$key_version")
+#    description=$(delete_line_if_contain_string "$description" "$key_url")
+#    description=$(delete_line_if_contain_string "$description" "$key_change_log_text")
+#    description=$(delete_line_if_contain_string "$description" "$key_change_log_url")
   fi
   echo "$description"
 }
