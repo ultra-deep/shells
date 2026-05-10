@@ -262,7 +262,7 @@ move_apk_to_repository_staging() {
 }
 
 move_apk_to_repository_production() {
-  appVersion=$(get_app_version_name_peoduction)
+  appVersion=$(get_app_version_name_production)
   move_apk_to_repository "$appVersion" "production" "debug"
   move_apk_to_repository "$appVersion" "production" "release"
 }
@@ -296,7 +296,7 @@ print_apk_local_version_if_exist() {
 
 print_is_correct_app_version_name() {
 
-  print_apk_local_version_if_exist "production" "$(get_app_version_name_peoduction)"
+  print_apk_local_version_if_exist "production" "$(get_app_version_name_production)"
   print_apk_local_version_if_exist "staging" "$(get_app_version_name_staging)"
   print_apk_local_version_if_exist "develop" "$(get_app_version_name_develop)"
 
@@ -382,7 +382,7 @@ get_apk_url(){ # output : https://azure.charisma.tech/Brokerage/e4553....
 
 get_apk_urls_of_production(){
   if($(isExistApkPathInAzureUrlArray production release) = "true") then
-    echo "Production v$(get_app_version_name_peoduction)"
+    echo "Production v$(get_app_version_name_production)"
     get_apk_url production release
   fi
 }
@@ -521,8 +521,8 @@ print_release_description(){
 
   local description="$MAIN_CONTENT_TEMPLATE"
 
-  description=$(get_release_description_and_url_if_exist "$description" "production" "release" "Production v$(get_app_version_name_peoduction)" "production_release_version" "production_release_url")
-  description=$(get_release_description_and_url_if_exist "$description" "production" "debug" "Production v$(get_app_version_name_peoduction) (Debug)" "production_debug_version" "production_debug_url")
+  description=$(get_release_description_and_url_if_exist "$description" "production" "release" "Production v$(get_app_version_name_production)" "production_release_version" "production_release_url")
+  description=$(get_release_description_and_url_if_exist "$description" "production" "debug" "Production v$(get_app_version_name_production) (Debug)" "production_debug_version" "production_debug_url")
 
   description=$(get_release_description_and_url_if_exist "$description" "staging" "release" "Staging v$(get_app_version_name_staging)" "staging_release_version" "staging_release_url")
   description=$(get_release_description_and_url_if_exist "$description" "staging" "debug" "Staging v$(get_app_version_name_staging) (Debug)" "staging_debug_version" "staging_debug_url")
@@ -556,7 +556,7 @@ commit_and_push_apks_with_print_infos(){
   print_line $INFO_COLOR
 
 
-  #commit_and_push_apks
+  commit_and_push_apks
 }
 #############################################################################
 #############################################################################
