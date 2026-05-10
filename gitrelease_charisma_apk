@@ -1,4 +1,5 @@
 #!/bin/bash
+
 RED='\033[1;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;36m'
@@ -53,20 +54,16 @@ MAIN_CONTENT_TEMPLATE="
 ⠀⠀⠀⠀⠀⠀⠈⠉⠉⠀⠀⠀⠀⠉⠉⠁⠀**⠀⠀⠀
 
 
-
 ⠀
 
 Hello everybody....
-
 The latest version of the **Android trader application** can be downloaded from the following addresses:
 
 
 
 **production_release_version: **   [**Release**](production_release_url)     [**Debug**](production_debug_url)    [Change Logs](production_change_log_url)
-
 **staging_release_version: **    [**Release**](staging_release_url)      [**Debug**](staging_debug_url)    [Change Logs](staging_change_log_url)
-
-**develop_release_version: **    [**Release**](develop_release_url)    [**Release**](develop_debug_url)   [Change Logs](develop_change_log_url)
+**develop_release_version: **    [**Release**](develop_release_url)    [**Debug**](develop_debug_url)   [Change Logs](develop_change_log_url)
 
 
 
@@ -204,7 +201,8 @@ get_azure_url(){
   local environment=$1  # production | staging | develop
   local buildMode=$2    # debug | release
   local apkFileName=$3  # trader-production-debug-v1.0.55.apk
-  echo "https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/$environment/$buildMode/$apkFileName&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true"
+
+  echo -e "https://azure.charisma.tech/Brokerage/e45539a6-393c-4129-9db8-1ce5febabe6c/_apis/git/repositories/911efa6a-effe-4402-a7c3-dc86278891c0/items?path=/${environment}/${buildMode}/${apkFileName}&versionDescriptor%5BversionOptions%5D=0&versionDescriptor%5BversionType%5D=0&versionDescriptor%5Bversion%5D=master&resolveLfs=true&%24format=octetStream&api-version=5.0&download=true"
 }
 
 is_exist_build_apk_in_local_storage() {
@@ -231,7 +229,7 @@ move_apk_to_repository() {
 
   if [  -f "$willChangeAPKPath" ]; then
     echo -e  "${ORANGE}Already File exits in APK repository : $willChangeAPKPath${NC}"
-    apk_azure_urls+=("$(get_azure_url "$environment" "$buildMode" "$willChangeAPKPath")")
+    apk_azure_urls+=("$(get_azure_url "$environment" "$buildMode" "$willChangeAPKFileName")")
     return
   fi
 
@@ -269,9 +267,19 @@ move_apk_to_repository_production() {
 
 
 move_all_apk_to_repository() {
-  move_apk_to_repository_develop
-  move_apk_to_repository_staging
-  move_apk_to_repository_production
+  if [[ "$releaseEnvironmentArgs" == *p* ]]; then
+    move_apk_to_repository_production
+  fi
+
+
+  if [[ "$releaseEnvironmentArgs" == *s* ]]; then
+    move_apk_to_repository_staging
+  fi
+
+
+  if [[ "$releaseEnvironmentArgs" == *d* ]]; then
+    move_apk_to_repository_develop
+  fi
 }
 
 print_apk_local_version_if_exist() {
@@ -355,9 +363,10 @@ isExistString(){
 isExistApkPathInAzureUrlArray(){
   local environment=$1 # production/staging/develop
   local buildType=$2 # example (one of):  dubeug / release=$1 # production/staging/develop @@@@@@
+  local apkUrl
   for apkUrl in "${apk_azure_urls[@]}"; do # apkUrl = https://azure.charisma.tech/Brokere....
-    if($(isExistString $apkUrl $environment) = "true") then
-      if($(isExistString $apkUrl $buildType) = "true") then
+    if [[  $(isExistString "$apkUrl" "$environment") == "true" ]]; then :
+      if [[ $(isExistString "$apkUrl" "$buildType") = "true" ]]; then :
         echo "true"
         return
       fi
@@ -368,12 +377,12 @@ isExistApkPathInAzureUrlArray(){
 
 
 get_apk_url(){ # output : https://azure.charisma.tech/Brokerage/e4553....
-  env=$1 # example (one of) : develop / staging / production
-  buildType=$2 # example (one of):  dubeug / release
+  local env=$1 # example (one of) : develop / staging / production
+  local buildType=$2 # example (one of):  dubeug / release
   for apkUrl in "${apk_azure_urls[@]}"; do # apkUrl = https://azure.charisma.tech/Brokere....
-    if($(isExistString $apkUrl $env) = "true") then
-      if($(isExistString $apkUrl $buildType) =  "true") then
-        echo -e "${BLUE}$apkUrl${NC}"
+    if [[ $(isExistString "$apkUrl" "$env") == "true" ]]; then :
+      if [[ $(isExistString "$apkUrl" "$buildType") ==  "true" ]]; then :
+        echo -e "$apkUrl"
         return
       fi
     fi
@@ -424,9 +433,8 @@ delete_line_if_contain_string(){
   local mainString=$1
   local targetString=$2
 
-
-#  local text="$1"
-#  local pattern="$2"
+  #  local text="$1"
+  #  local pattern="$2"
   # Use grep -v to omit lines containing the pattern
   printf "%s" "$mainString" | grep -v -- "$targetString"
 
@@ -455,7 +463,6 @@ get_key_change_log_url() {
     echo "develop_change_log_url"
   fi
 }
-
 
 
 get_change_log_text() {
@@ -503,6 +510,8 @@ get_release_description_and_url_if_exist(){
 
     url=$(get_apk_url "$environment" "$builtType")
 
+    url=${url//&/\\&}
+
     description="${description/$key_version/$versionName}"
     description="${description/$key_url/$url}"
     description="${description/$key_change_log_text/$change_log_text}"
@@ -521,15 +530,20 @@ print_release_description(){
 
   local description="$MAIN_CONTENT_TEMPLATE"
 
-  description=$(get_release_description_and_url_if_exist "$description" "production" "release" "Production v$(get_app_version_name_production)" "production_release_version" "production_release_url")
-  description=$(get_release_description_and_url_if_exist "$description" "production" "debug" "Production v$(get_app_version_name_production) (Debug)" "production_debug_version" "production_debug_url")
+  if [[ "$releaseEnvironmentArgs" == *p* ]]; then
+    description=$(get_release_description_and_url_if_exist "$description" "production" "release" "Production v$(get_app_version_name_production)" "production_release_version" "production_release_url")
+    description=$(get_release_description_and_url_if_exist "$description" "production" "debug" "Production v$(get_app_version_name_production) (Debug)" "production_debug_version" "production_debug_url")
+  fi
 
-  description=$(get_release_description_and_url_if_exist "$description" "staging" "release" "Staging v$(get_app_version_name_staging)" "staging_release_version" "staging_release_url")
-  description=$(get_release_description_and_url_if_exist "$description" "staging" "debug" "Staging v$(get_app_version_name_staging) (Debug)" "staging_debug_version" "staging_debug_url")
+  if [[ "$releaseEnvironmentArgs" == *s* ]]; then
+    description=$(get_release_description_and_url_if_exist "$description" "staging" "release" "Staging v$(get_app_version_name_staging)" "staging_release_version" "staging_release_url")
+    description=$(get_release_description_and_url_if_exist "$description" "staging" "debug" "Staging v$(get_app_version_name_staging) (Debug)" "staging_debug_version" "staging_debug_url")
+  fi
 
-  description=$(get_release_description_and_url_if_exist "$description" "develop" "release" "Develop v$(get_app_version_name_develop)" "develop_release_version" "develop_release_url")
-  description=$(get_release_description_and_url_if_exist "$description" "develop" "debug" "Develop v$(get_app_version_name_develop) (Debug)" "develop_debug_version" "develop_debug_url")
-
+  if [[ "$releaseEnvironmentArgs" == *d* ]]; then
+    description=$(get_release_description_and_url_if_exist "$description" "develop" "release" "Develop v$(get_app_version_name_develop)" "develop_release_version" "develop_release_url")
+    description=$(get_release_description_and_url_if_exist "$description" "develop" "debug" "Develop v$(get_app_version_name_develop) (Debug)" "develop_debug_version" "develop_debug_url")
+  fi
 
   echo -e "$description"
 
@@ -563,6 +577,10 @@ commit_and_push_apks_with_print_infos(){
 # BASH STARTED
 #############################################################################
 #############################################################################
+
+releaseEnvironmentArgs="${1:-psd}"
+
+
 
 print_all_exist_apk_version_name_and_wait_to_press_any_key
 moving_all_exit_apk_to_git_repository
