@@ -49,11 +49,11 @@ set_shortcut() {
 }
 
 
-set_shortcut ppproxy-disable "<Shift><Ctrl>Escape" "ppproxy 0"
-set_shortcut ppproxy-1 "<Shift><Ctrl>1" "ppproxy 1"
-set_shortcut ppproxy-2 "<Shift><Ctrl>2" "ppproxy 2"
-set_shortcut ppproxy-3 "<Shift><Ctrl>3" "ppproxy 3"
-set_shortcut ppproxy-3 "<Shift><Ctrl>4" "ppproxy 4"
+set_shortcut ppproxy-disable "<Super><Shift>Escape" "ppproxy 0"
+set_shortcut ppproxy-1 "<Super><Shift>1" "ppproxy 1"
+set_shortcut ppproxy-2 "<Super><Shift>2" "ppproxy 2"
+set_shortcut ppproxy-3 "<Super><Shift>3" "ppproxy 3"
+set_shortcut ppproxy-3 "<Super><Shift>4" "ppproxy 4"
 
 
 
