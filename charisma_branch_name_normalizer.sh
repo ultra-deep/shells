@@ -43,7 +43,7 @@ text=$(echo "$text" | sed -E 's/^[Tt][Aa][Ss][Kk][[:space:]]*//')
 # Replace non-alphanumeric characters with '-',
 # collapse multiple dashes, and trim from start/end
 text=$(echo "$text" | \
-  sed -E 's/[^A-Za-z0-9]+/-/g' | \
+  sed -E 's/[^A-Za-z0-9.()]+/-/g' | \
   sed -E 's/^-+|-+$//g'
 )
 
