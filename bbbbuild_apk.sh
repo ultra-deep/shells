@@ -54,31 +54,36 @@ build() {
     echo " "
     echo " "
 
+    ./gradlew --stop
+    ./gradlew clean
     ./gradlew "assemble${environmentCapitalized}${buildTypeCapitalized}"
     mkdir -p "app/${environment}/$buildType" #app/production/debug
     mv "/home/x/AndroidStudioProjects/AndriodTraderApp/app/build/outputs/apk/${environment}/${buildType}/app-${environment}-${buildType}.apk" "app/${environment}/${buildType}/"
 }
 
+ALL=false
+if [[ "$ARGS" == "-a" ]]; then
+    ALL=true
+fi
 
-
-if [[ "$ARGS" == *"-pr"* ]]; then
+if [[ "$ARGS" == *"-pr"* || "$ALL" == true ]]; then
     build "production" "release"
 fi
-if [[ "$ARGS" == *"-pd"* ]]; then
+if [[ "$ARGS" == *"-pd"* || "$ALL" == true ]]; then
     build "production" "debug"
 fi
 
-if [[ "$ARGS" == *"-sr"* ]]; then
+if [[ "$ARGS" == *"-sr"* || "$ALL" == true ]]; then
     build "staging" "release"
 fi
-if [[ "$ARGS" == *"-sd"* ]]; then
+if [[ "$ARGS" == *"-sd"* || "$ALL" == true ]]; then
     build "staging" "debug"
 fi
 
-if [[ "$ARGS" == *"-dr"* ]]; then
+if [[ "$ARGS" == *"-dr"* || "$ALL" == true ]]; then
     build "develop" "release"
 fi
-if [[ "$ARGS" == *"-dd"* ]]; then
+if [[ "$ARGS" == *"-dd"* || "$ALL" == true ]]; then
     build "develop" "debug"
 fi
 
@@ -95,4 +100,8 @@ if [[ -z "$ARGS" ]]; then
     echo "--------------------------------------------------------------"
     echo "-pr-sr-dr  -> All (Release)"
     echo "-pd-sd-dd  -> All (Debug)"
+    echo "--------------------------------------------------------------"
+    echo "    Also, you can use -a for all"
+    echo "--------------------------------------------------------------"
+    echo "-a    ->  All (Debug and Release) -pr-sr-dr-pd-sd-dd"
 fi
