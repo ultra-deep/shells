@@ -53,6 +53,7 @@ set_shortcut ppproxy-disable "<Super><Ctrl>Escape" "ppproxy 0"
 set_shortcut ppproxy-1 "<Super><Ctrl>F1" "ppproxy 1"
 set_shortcut ppproxy-2 "<Super><Ctrl>F2" "ppproxy 2"
 set_shortcut ppproxy-3 "<Super><Ctrl>F3" "ppproxy 3"
+set_shortcut me-swagger-auth "<Super>A" "/home/x/IdeaProjects/deep-microservices/enq-service/scripts/me_copy_token_to_clipboard_and_pate_it.sh"
 
 
 
