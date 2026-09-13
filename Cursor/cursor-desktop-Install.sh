@@ -3,7 +3,7 @@
 set -e
 
 APP_NAME="Cursor"
-APPIMAGE="$(pwd)/Cursor-3.17.8-x86_64.AppImage"
+APPIMAGE="$(pwd)/Cursor-x86_64.AppImage"
 ICON="$(pwd)/Cursor.png"
 DESKTOP_DIR="$HOME/.local/share/applications"
 DESKTOP_FILE="$DESKTOP_DIR/$APP_NAME.desktop"
