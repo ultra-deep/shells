@@ -25,13 +25,13 @@ mkdir -p "$DESKTOP_DIR"
 cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Name=$APP_NAME
-Comment=$APP_NAME AppImage
+Comment=Cursor AI Code Editor
 Exec=$APPIMAGE
 Icon=$ICON
 Terminal=false
 Type=Application
-Categories=Utility;
-StartupWMClass=$APP_NAME
+Categories=Development,IDE,AI;
+StartupWMClass=$APP_NAME # if the app runned in another launcger-icon Use this command an click on runned Cursor application to get correct value and set it to StartupWMClass :   xprop WM_CLASS
 EOF
 
 chmod +x "$DESKTOP_FILE"
