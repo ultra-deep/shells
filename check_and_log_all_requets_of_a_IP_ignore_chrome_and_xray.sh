@@ -1,0 +1,1 @@
+while true; do sudo ss -tnpH dst 146.19.104.49 | sed -E "s/^/$(date -Is) /; s/users:\(\(\"([^\"]+)\",pid=([0-9]+),fd=[0-9]+\)\).*/proc=\1 pid=\2/" | grep -Ev 'proc=(xray|chrome)( |$)' >> ip_log.txt; sleep 1; done
