@@ -113,6 +113,17 @@ def is_ancestor(branch: str) -> bool:
     )
 
 
+def is_usable_target(branch: str, current: str) -> bool:
+    """True if origin/<branch> can be a PR base for HEAD (never the current branch)."""
+    if not branch or branch == current or is_junk(branch):
+        return False
+    if not remote_exists(branch):
+        return False
+    # Hopping between unrelated locals (A→B→A) must not pick B as parent of A
+    # unless B is actually in HEAD's history.
+    return is_ancestor(branch)
+
+
 def parse_task_id(branch: str) -> str | None:
     m = TASK_ID_RE.match(branch)
     return m.group(1) if m else None
@@ -174,29 +185,29 @@ def resolve_target(current: str, override: str | None) -> TargetResolution:
             checkouts.append((frm, to))
 
     # Step 2: walk HEAD reflog stack from current
-    seen_missing: set[str] = {current}
     immediate: str | None = None
     for frm, to in checkouts:
         if to == current and frm != current and not is_junk(frm):
             immediate = frm
             break
+    if immediate and is_usable_target(immediate, current):
+        return TargetResolution(immediate, "HEAD reflog (immediate parent)")
     if immediate:
-        if remote_exists(immediate):
-            return TargetResolution(immediate, "HEAD reflog (immediate parent)")
-        # walk ancestors through deleted stack branches
+        # Walk through deleted (or unusable) stack branches. Skip bounces
+        # back to the current branch (checkout A→B then B→A).
         cursor = immediate
-        deleted = immediate
-        seen_missing.add(cursor)
+        deleted = immediate if not remote_exists(immediate) else None
         for frm, to in checkouts:
-            if to != cursor or is_junk(frm) or frm == cursor:
+            if to != cursor or is_junk(frm) or frm == cursor or frm == current:
                 continue
-            if remote_exists(frm):
+            if is_usable_target(frm, current):
                 return TargetResolution(
                     frm,
                     "HEAD reflog (nearest surviving parent)",
-                    deleted_intermediate=deleted,
+                    deleted_intermediate=deleted or immediate,
                 )
-            seen_missing.add(frm)
+            if not remote_exists(frm):
+                deleted = deleted or frm
             cursor = frm
 
     # Step 3: current-branch reflog
@@ -210,11 +221,9 @@ def resolve_target(current: str, override: str | None) -> TargetResolution:
             m2 = CREATED_FROM_RE.search(line)
             if m2:
                 parent = strip_ref(m2.group("ref"))
-        if not parent or parent == current or is_junk(parent):
+        if not parent or not is_usable_target(parent, current):
             continue
-        if remote_exists(parent):
-            return TargetResolution(parent, "current-branch reflog")
-        break  # had a candidate but missing → continue to step 4
+        return TargetResolution(parent, "current-branch reflog")
 
     # Step 4: nearest surviving feature ancestor from known stack bases
     candidates: list[str] = []
@@ -226,18 +235,20 @@ def resolve_target(current: str, override: str | None) -> TargetResolution:
         listing = run(["git", "branch", "-r", "--list", f"origin/{task}-*"], check=False)
         for line in listing.splitlines():
             name = strip_ref(line.strip())
-            if name and name != current and not is_junk(name):
+            if is_usable_target(name, current):
                 candidates.append(name)
 
     # known stack bases from HEAD reflog checkouts
     for frm, to in checkouts:
         for name in (frm, to):
-            if name == current or is_junk(name) or name in TRUNK_BRANCHES:
+            if name in TRUNK_BRANCHES:
                 continue
-            if remote_exists(name):
+            if is_usable_target(name, current):
                 candidates.append(name)
 
-    picked = _pick_best(candidates, prefer_reflog_order=[frm for frm, _ in checkouts])
+    picked = _pick_best(
+        candidates, current, prefer_reflog_order=[frm for frm, _ in checkouts]
+    )
     if picked:
         return TargetResolution(
             picked,
@@ -246,7 +257,7 @@ def resolve_target(current: str, override: str | None) -> TargetResolution:
         )
 
     # Step 5: trunk fallback
-    trunk_pick = _pick_best(list(TRUNK_BRANCHES), prefer_reflog_order=[])
+    trunk_pick = _pick_best(list(TRUNK_BRANCHES), current, prefer_reflog_order=[])
     if trunk_pick:
         return TargetResolution(trunk_pick, "trunk fallback")
 
@@ -256,33 +267,30 @@ def resolve_target(current: str, override: str | None) -> TargetResolution:
     )
 
 
-def _pick_best(candidates: list[str], prefer_reflog_order: list[str]) -> str | None:
-    scored: list[tuple[int, int, int, str]] = []
-    # lower is better: (ahead, trunk_penalty, reflog_index, name)
+def _pick_best(
+    candidates: list[str],
+    current: str,
+    prefer_reflog_order: list[str],
+) -> str | None:
+    scored: list[tuple[int, int, int, int, str]] = []
+    # lower is better: (non_ancestor, ahead, trunk_penalty, reflog_index, name)
     reflog_index = {name: i for i, name in enumerate(prefer_reflog_order)}
     seen: set[str] = set()
     for name in candidates:
-        if name in seen or not remote_exists(name):
+        if name in seen or not is_usable_target(name, current):
             continue
         seen.add(name)
         ahead = ahead_count(name)
         if ahead is None:
             continue
-        # Prefer ancestors of HEAD
-        if not is_ancestor(name) and ahead > 0:
-            # still allow if tip-equal-ish; skip unrelated large divergences later via ahead
-            pass
+        non_ancestor = 0 if is_ancestor(name) else 1
         trunk_penalty = 0 if name not in TRUNK_BRANCHES else 1
         idx = reflog_index.get(name, 10_000)
-        scored.append((ahead, trunk_penalty, idx, name))
+        scored.append((non_ancestor, ahead, trunk_penalty, idx, name))
     if not scored:
         return None
     scored.sort()
-    best_ahead = scored[0][0]
-    top = [s for s in scored if s[0] == best_ahead]
-    # prefer non-trunk, then nearest reflog
-    top.sort(key=lambda s: (s[1], s[2], s[3]))
-    return top[0][3]
+    return scored[0][4]
 
 
 class AzdoClient:
@@ -315,6 +323,8 @@ class AzdoClient:
         except urllib.error.HTTPError as e:
             detail = e.read().decode(errors="replace")
             raise Fatal(f"Azure DevOps {method} {url} → HTTP {e.code}\n{detail[:2000]}") from e
+        except urllib.error.URLError as e:
+            raise Fatal(f"Azure DevOps {method} {url} → {e}") from e
 
     def get(self, url: str) -> Any:
         return self.request("GET", url)
