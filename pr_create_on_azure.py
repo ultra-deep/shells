@@ -14,9 +14,9 @@ Mirrors `.cursor/rules/azure-devops-pr-work-item.mdc`:
 Requires: AZDO_PAT (see docs/azure-devops-pat.md). Stdlib only.
 
 Usage:
-  ./create_azdo_pr.py
-  ./create_azdo_pr.py --into 55816-Feature-Loan
-  ./create_azdo_pr.py --draft --dry-run
+  ./pr_create_on_azure.py
+  ./pr_create_on_azure.py --into 55816-Feature-Loan
+  ./pr_create_on_azure.py --draft --dry-run
 """
 
 from __future__ import annotations
@@ -652,7 +652,7 @@ def create_pr_flow(
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Create an Azure DevOps PR (same workflow as Cursor `create_azdo_pr.sh`)."
+        description="Create an Azure DevOps PR (same workflow as Cursor `pr_create_on_azure.sh`)."
     )
     parser.add_argument(
         "--into",

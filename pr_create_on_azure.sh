@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Same as Cursor `create_azdo_pr.sh` — see scripts/create_azdo_pr.py
+# Same as Cursor `pr_create_on_azure.sh` — see scripts/pr_create_on_azure.py
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec python3 "$ROOT/scripts/create_azdo_pr.py" "$@"
+exec python3 "$ROOT/pr_create_on_azure.py" "$@"
