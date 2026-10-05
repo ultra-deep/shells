@@ -119,6 +119,10 @@ def is_usable_target(branch: str, current: str) -> bool:
         return False
     if not remote_exists(branch):
         return False
+    # Long-lived feature branches (e.g. 55816-Feature-Loan) often diverge from
+    # develop/staging/master, so trunk is still a valid integration target.
+    if branch in TRUNK_BRANCHES:
+        return True
     # Hopping between unrelated locals (A→B→A) must not pick B as parent of A
     # unless B is actually in HEAD's history.
     return is_ancestor(branch)
