@@ -63,6 +63,9 @@ init_firewall() {
 	firewall-cmd --add-port=80/tcp --permanent
 	firewall-cmd --add-port=8888/tcp --permanent
 	firewall-cmd --add-port=8080/tcp --permanent
+	firewall-cmd --add-port=9090/tcp --permanent
+	firewall-cmd --add-port=9999/tcp --permanent
+	firewall-cmd --add-port=7777/tcp --permanent
 	firewall-cmd --add-port=47000/tcp --permanent
 	firewall-cmd --add-port=47001/tcp --permanent
 	firewall-cmd --add-port=47002/tcp --permanent
@@ -70,6 +73,8 @@ init_firewall() {
 	firewall-cmd --add-port=47004/tcp --permanent
 	firewall-cmd --add-port=47005/tcp --permanent
 	firewall-cmd --add-port=47006/tcp --permanent
+	firewall-cmd --add-port=47007/tcp --permanent
+	firewall-cmd --add-port=47008/tcp --permanent
 	firewall-cmd --reload⁠
 }
 

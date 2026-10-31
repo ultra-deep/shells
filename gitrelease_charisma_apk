@@ -57,7 +57,7 @@ MAIN_CONTENT_TEMPLATE="
 ⠀
 
 Hello everybody....
-The latest version of the **Android trader application** can be downloaded from the following addresses:
+The latest version of the **Android trader application** can be downloaded from the following links:
 
 
 
@@ -67,7 +67,7 @@ The latest version of the **Android trader application** can be downloaded from 
 
 
 
-@pakan @a.sedaghatipour @a.yaalimadad @m.mostafaei @sh.ranjbar
+@pakan @a.sedaghatipour @amiralimadad  @m.mostafaei @sh.ranjbar @s.arshadi
 "
 
 changeLog_production_url="https://azure.charisma.tech/Brokerage/Trader/_wiki/wikis/Trader.wiki/311/Production"
@@ -75,7 +75,7 @@ changeLog_staging_url="https://azure.charisma.tech/Brokerage/Trader/_wiki/wikis/
 changeLog_develop_url="https://azure.charisma.tech/Brokerage/Trader/_wiki/wikis/Trader.wiki/312/Develop"
 
 projectPath=/home/x/AndroidStudioProjects/AndriodTraderApp
-apkRepositoryPath=/home/x/Downloads/Android-Apk
+apkRepositoryPath=/home/x/Downloads/Android-APK
 
 apkVersions=() # production (v1.0.10)
 apk_azure_urls=()
