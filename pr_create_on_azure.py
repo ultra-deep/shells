@@ -19,6 +19,7 @@ Usage:
   ./pr_create_on_azure.py --draft --dry-run
 """
 
+
 from __future__ import annotations
 
 import argparse
@@ -377,6 +378,31 @@ def fetch_work_item_title(client: AzdoClient, task_id: str) -> str | None:
     return None
 
 
+def work_item_url(task_id: str) -> str:
+    return f"{ORG}/Trader/_workitems/edit/{task_id}"
+
+
+def strip_task_id_ref(name: str, task_id: str) -> str:
+    """Remove a leading/trailing #taskId (or bare id) so we can re-append once at the end."""
+    cleaned = name.strip()
+    cleaned = re.sub(rf"^#?{re.escape(task_id)}\b\s*", "", cleaned)
+    cleaned = re.sub(rf"\s*#?{re.escape(task_id)}\b$", "", cleaned)
+    return cleaned.strip()
+
+
+def with_task_id_suffix(name: str, task_id: str | None) -> str:
+    """Append ` #12345` at the end (Azure DevOps auto-links #id in PR titles)."""
+    if not task_id:
+        return name
+    base = strip_task_id_ref(name, task_id) or name.strip()
+    return f"{base} #{task_id}"
+
+
+def task_id_markdown_link(task_id: str) -> str:
+    """Clickable `#12345` for Goft / Mattermost."""
+    return f"[#{task_id}]({work_item_url(task_id)})"
+
+
 def build_title_and_description(
     target: str,
     task_id: str | None,
@@ -391,21 +417,10 @@ def build_title_and_description(
 
     # Prefer Azure work item title when available (same wording as the Task).
     if work_item_title:
-        if task_id:
-            # Avoid "#123 #123 Title" if WI title already starts with the id.
-            wi = work_item_title
-            if re.match(rf"^#?{re.escape(task_id)}\b", wi):
-                title = wi if wi.startswith("#") else f"#{wi}"
-            else:
-                title = f"#{task_id} {wi}"
-        else:
-            title = work_item_title
+        title = with_task_id_suffix(work_item_title, task_id)
     else:
         subject = commits[0].split(" ", 1)[-1]
-        if task_id and not subject.startswith(f"#{task_id}"):
-            title = f"#{task_id} {subject}"
-        else:
-            title = subject
+        title = with_task_id_suffix(subject, task_id)
 
     bullets = []
     for line in commits[:8]:
@@ -415,12 +430,56 @@ def build_title_and_description(
         bullets.append(f"- …and {len(commits) - 8} more commit(s)")
 
     description = "## Summary\n" + "\n".join(bullets) + "\n\n## Test plan\n- [ ] Manual verification on device/emulator\n"
+    if task_id:
+        description += f"\n## Work item\n- {task_id_markdown_link(task_id)}\n"
     return title, description
 
 
-def short_description(commits_subject: str) -> str:
-    # Strip leading "#12345 " for Goft blurb
-    return re.sub(r"^#\d+\s*", "", commits_subject).strip()
+def short_description(commits_subject: str, task_id: str | None = None) -> str:
+    """Goft blurb: task name with a clickable `#id` link at the end."""
+    base = commits_subject.strip()
+    if task_id:
+        base = strip_task_id_ref(base, task_id)
+    else:
+        base = re.sub(r"^#\d+\s*", "", base)
+        base = re.sub(r"\s*#\d+$", "", base)
+    base = base.strip()
+    if task_id:
+        return f"{base} {task_id_markdown_link(task_id)}".strip()
+    return base
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """Copy text to the system clipboard. Returns True on success (stdlib only)."""
+    candidates: list[list[str]] = []
+    if sys.platform == "darwin":
+        candidates.append(["pbcopy"])
+    elif sys.platform.startswith("linux"):
+        # Wayland first, then X11 tools.
+        candidates.extend(
+            [
+                ["wl-copy"],
+                ["xclip", "-selection", "clipboard"],
+                ["xsel", "--clipboard", "--input"],
+            ]
+        )
+    elif sys.platform.startswith("win"):
+        candidates.append(["clip"])
+
+    payload = text.encode("utf-8")
+    for cmd in candidates:
+        try:
+            result = subprocess.run(
+                cmd,
+                input=payload,
+                check=False,
+                capture_output=True,
+            )
+        except FileNotFoundError:
+            continue
+        if result.returncode == 0:
+            return True
+    return False
 
 
 def create_pr_flow(
@@ -607,7 +666,7 @@ def create_pr_flow(
         wi_type = fields.get("System.WorkItemType")
         wi_url = (
             wi.get("_links", {}).get("html", {}).get("href")
-            or f"{ORG}/Trader/_workitems/edit/{task_id}"
+            or work_item_url(task_id)
         )
         if wi_type != "Task":
             print(f"Skipped work-item update: type is {wi_type!r}, expected Task")
@@ -648,15 +707,24 @@ def create_pr_flow(
                 f"  Remaining: {remaining_f} → 0"
             )
 
+    goft_blurb = short_description(title, task_id)
+    goft_block = f"{pr_url}\n{goft_blurb}"
     print("\n--- Goft (cip_android) ---")
-    print(pr_url)
-    print(short_description(title))
+    print(goft_block)
     print("--------------------------")
+    if copy_to_clipboard(goft_block):
+        print("Copied Goft block to clipboard.")
+    else:
+        print(
+            "Warning: could not copy to clipboard "
+            "(install wl-copy, xclip, or xsel).",
+            file=sys.stderr,
+        )
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Create an Azure DevOps PR (same workflow as Cursor `pr_create_on_azure.sh`)."
+        description="Create an Azure DevOps PR (same workflow as Cursor `ppr_create_on_azure.sh`)."
     )
     parser.add_argument(
         "--into",
