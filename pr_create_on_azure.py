@@ -19,6 +19,7 @@ Usage:
   ./pr_create_on_azure.py --draft --dry-run
 """
 
+#AZDO_PATH=hqa7l7fmjjhw63d63kesutiuevu5ze2dfjkmdexujw33irwdtncq
 
 from __future__ import annotations
 
@@ -772,3 +773,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Interrupted.", file=sys.stderr)
         raise SystemExit(130) from None
+
