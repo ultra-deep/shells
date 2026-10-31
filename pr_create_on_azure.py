@@ -451,7 +451,11 @@ def short_description(commits_subject: str, task_id: str | None = None) -> str:
 
 
 def copy_to_clipboard(text: str) -> bool:
-    """Copy text to the system clipboard. Returns True on success (stdlib only)."""
+    """Copy text to the system clipboard. Returns True on success (stdlib only).
+
+    xclip/xsel often keep running to serve the selection; treat a hung process
+    after stdin is accepted as success (do not kill — that clears the clipboard).
+    """
     candidates: list[list[str]] = []
     if sys.platform == "darwin":
         candidates.append(["pbcopy"])
@@ -460,7 +464,7 @@ def copy_to_clipboard(text: str) -> bool:
         candidates.extend(
             [
                 ["wl-copy"],
-                ["xclip", "-selection", "clipboard"],
+                ["xclip", "-selection", "clipboard", "-in"],
                 ["xsel", "--clipboard", "--input"],
             ]
         )
@@ -470,15 +474,22 @@ def copy_to_clipboard(text: str) -> bool:
     payload = text.encode("utf-8")
     for cmd in candidates:
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 cmd,
-                input=payload,
-                check=False,
-                capture_output=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+                start_new_session=True,
             )
         except FileNotFoundError:
             continue
-        if result.returncode == 0:
+        try:
+            proc.communicate(input=payload, timeout=1.5)
+        except subprocess.TimeoutExpired:
+            # Clipboard helper is still serving the paste — content was accepted.
+            return True
+        if proc.returncode == 0:
             return True
     return False
 
