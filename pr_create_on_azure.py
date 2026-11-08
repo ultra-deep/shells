@@ -384,19 +384,19 @@ def work_item_url(task_id: str) -> str:
 
 
 def strip_task_id_ref(name: str, task_id: str) -> str:
-    """Remove a leading/trailing #taskId (or bare id) so we can re-append once at the end."""
+    """Remove a leading/trailing #taskId (or bare id) so we can re-prefix once at the start."""
     cleaned = name.strip()
     cleaned = re.sub(rf"^#?{re.escape(task_id)}\b\s*", "", cleaned)
     cleaned = re.sub(rf"\s*#?{re.escape(task_id)}\b$", "", cleaned)
     return cleaned.strip()
 
 
-def with_task_id_suffix(name: str, task_id: str | None) -> str:
-    """Append ` #12345` at the end (Azure DevOps auto-links #id in PR titles)."""
+def with_task_id_prefix(name: str, task_id: str | None) -> str:
+    """Put `#12345` at the start (Azure DevOps auto-links #id in PR titles)."""
     if not task_id:
         return name
     base = strip_task_id_ref(name, task_id) or name.strip()
-    return f"{base} #{task_id}"
+    return f"#{task_id} {base}"
 
 
 def task_id_markdown_link(task_id: str) -> str:
@@ -418,10 +418,10 @@ def build_title_and_description(
 
     # Prefer Azure work item title when available (same wording as the Task).
     if work_item_title:
-        title = with_task_id_suffix(work_item_title, task_id)
+        title = with_task_id_prefix(work_item_title, task_id)
     else:
         subject = commits[0].split(" ", 1)[-1]
-        title = with_task_id_suffix(subject, task_id)
+        title = with_task_id_prefix(subject, task_id)
 
     bullets = []
     for line in commits[:8]:
@@ -437,7 +437,7 @@ def build_title_and_description(
 
 
 def short_description(commits_subject: str, task_id: str | None = None) -> str:
-    """Goft blurb: task name with a clickable `#id` link at the end."""
+    """Goft blurb: clickable `#id` link first, then the task name."""
     base = commits_subject.strip()
     if task_id:
         base = strip_task_id_ref(base, task_id)
@@ -446,7 +446,7 @@ def short_description(commits_subject: str, task_id: str | None = None) -> str:
         base = re.sub(r"\s*#\d+$", "", base)
     base = base.strip()
     if task_id:
-        return f"{base} {task_id_markdown_link(task_id)}".strip()
+        return f"{task_id_markdown_link(task_id)} {base}".strip()
     return base
 
 
@@ -784,4 +784,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Interrupted.", file=sys.stderr)
         raise SystemExit(130) from None
-
