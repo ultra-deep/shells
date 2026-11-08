@@ -365,22 +365,68 @@ def ensure_pushed(current: str) -> None:
         print(f"Branch up to date with {upstream}")
 
 
-def fetch_work_item_title(client: AzdoClient, task_id: str) -> str | None:
-    """Return System.Title for the work item, or None if missing/unreachable."""
-    try:
-        wi = client.get(f"{PROJECT_APIS}/wit/workitems/{task_id}?api-version=7.0")
-    except Fatal as e:
-        print(f"Warning: could not fetch work item #{task_id} for title: {e}", file=sys.stderr)
+# Goft (Mattermost) paste template. Keys filled from the created PR + Task.
+GOFT_TEMPLATE = (
+    ":parking: [PR #{pr_id}   {pr_title}]({pr_url})\n"
+    "\n"
+    ":large_yellow_square:  [Task #{task_id}]({task_url}) "
+)
+GOFT_PR_ONLY_TEMPLATE = ":parking: [#{pr_id} {pr_title}]({pr_url})"
+
+
+@dataclass(frozen=True)
+class WorkItemRef:
+    id: str
+    title: str
+    url: str
+    work_item_type: str | None = None
+
+
+def work_item_url(work_item_id: str) -> str:
+    return f"{ORG}/Trader/_workitems/edit/{work_item_id}"
+
+
+def _work_item_ref_from_payload(wi: dict[str, Any]) -> WorkItemRef | None:
+    wi_id = wi.get("id")
+    if wi_id is None:
         return None
-    title = (wi.get("fields") or {}).get("System.Title")
-    if isinstance(title, str):
-        title = title.strip()
-        return title or None
-    return None
+    fields = wi.get("fields") or {}
+    title = fields.get("System.Title")
+    if not isinstance(title, str) or not title.strip():
+        return None
+    html = (wi.get("_links") or {}).get("html") or {}
+    href = html.get("href") if isinstance(html, dict) else None
+    return WorkItemRef(
+        id=str(wi_id),
+        title=title.strip(),
+        url=href or work_item_url(str(wi_id)),
+        work_item_type=fields.get("System.WorkItemType"),
+    )
 
 
-def work_item_url(task_id: str) -> str:
-    return f"{ORG}/Trader/_workitems/edit/{task_id}"
+def fetch_work_item(
+    client: AzdoClient,
+    work_item_id: str,
+) -> dict[str, Any] | None:
+    """Return the raw work-item JSON, or None if missing/unreachable."""
+    try:
+        return client.get(
+            f"{PROJECT_APIS}/wit/workitems/{work_item_id}?api-version=7.0"
+        )
+    except Fatal as e:
+        print(
+            f"Warning: could not fetch work item #{work_item_id}: {e}",
+            file=sys.stderr,
+        )
+        return None
+
+
+def fetch_work_item_ref(
+    client: AzdoClient,
+    work_item_id: str,
+) -> WorkItemRef | None:
+    wi = fetch_work_item(client, work_item_id)
+    return _work_item_ref_from_payload(wi) if wi else None
 
 
 def strip_task_id_ref(name: str, task_id: str) -> str:
@@ -436,9 +482,35 @@ def build_title_and_description(
     return title, description
 
 
-def short_description(commits_subject: str, task_id: str | None = None) -> str:
-    """Goft blurb: clickable `#id` link first, then the task name."""
-    base = commits_subject.strip()
+def format_goft_blurb(
+    *,
+    pr_id: str | int,
+    pr_title: str,
+    pr_url: str,
+    task: WorkItemRef | None,
+    fallback_task_title: str,
+    task_id: str | None,
+) -> str:
+    """Fill GOFT_TEMPLATE from the created PR + Task."""
+    display_pr_title = pr_title.strip()
+    if task_id:
+        display_pr_title = (
+            strip_task_id_ref(display_pr_title, task_id) or display_pr_title
+        )
+    pr_line = {
+        "pr_id": pr_id,
+        "pr_title": display_pr_title,
+        "pr_url": pr_url,
+    }
+    if task is not None:
+        return GOFT_TEMPLATE.format(
+            **pr_line,
+            task_id=task.id,
+            task_url=task.url,
+            task_title=strip_task_id_ref(task.title, task.id),
+        )
+
+    base = fallback_task_title.strip()
     if task_id:
         base = strip_task_id_ref(base, task_id)
     else:
@@ -446,8 +518,13 @@ def short_description(commits_subject: str, task_id: str | None = None) -> str:
         base = re.sub(r"\s*#\d+$", "", base)
     base = base.strip()
     if task_id:
-        return f"{task_id_markdown_link(task_id)} {base}".strip()
-    return base
+        return GOFT_TEMPLATE.format(
+            **pr_line,
+            task_id=task_id,
+            task_url=work_item_url(task_id),
+            task_title=base or fallback_task_title.strip(),
+        )
+    return GOFT_PR_ONLY_TEMPLATE.format(**pr_line)
 
 
 def copy_to_clipboard(text: str) -> bool:
@@ -525,15 +602,15 @@ def create_pr_flow(
     ahead = ahead_count(target)
     print(f"Ahead:   {ahead} commit(s)")
 
-    # Need PAT early so the PR title can use the work item title.
+    # Need PAT early so the PR title / Goft blurb can use the Task title.
     client: AzdoClient | None = None
-    work_item_title: str | None = None
+    task_ref: WorkItemRef | None = None
     if task_id:
         try:
             client = AzdoClient(load_pat())
-            work_item_title = fetch_work_item_title(client, task_id)
-            if work_item_title:
-                print(f"WI title: {work_item_title}")
+            task_ref = fetch_work_item_ref(client, task_id)
+            if task_ref:
+                print(f"WI title: {task_ref.title}")
         except Fatal as e:
             if dry_run:
                 print(f"Warning: {e}", file=sys.stderr)
@@ -541,7 +618,9 @@ def create_pr_flow(
                 raise
 
     title, description = build_title_and_description(
-        target, task_id, work_item_title=work_item_title
+        target,
+        task_id,
+        work_item_title=task_ref.title if task_ref else None,
     )
     print(f"Title:   {title}")
 
@@ -719,8 +798,14 @@ def create_pr_flow(
                 f"  Remaining: {remaining_f} → 0"
             )
 
-    goft_blurb = short_description(title, task_id)
-    goft_block = f"{pr_url}\n{goft_blurb}"
+    goft_block = format_goft_blurb(
+        pr_id=pr_id,
+        pr_title=title,
+        pr_url=pr_url,
+        task=task_ref,
+        fallback_task_title=title,
+        task_id=task_id,
+    )
     print("\n--- Goft (cip_android) ---")
     print(goft_block)
     print("--------------------------")
