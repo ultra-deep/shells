@@ -57,9 +57,26 @@ CHECKOUT_RE = re.compile(
 CREATED_FROM_RE = re.compile(r"branch: Created from (?P<ref>\S+)\s*$")
 TASK_ID_RE = re.compile(r"^(\d+)-")
 
+# ANSI colors for the final target-branch line (green=develop, orange=other).
+_COLOR_RESET = "\033[0m"
+_COLOR_GREEN = "\033[32m"
+_COLOR_ORANGE = "\033[38;5;208m"
+
 
 class Fatal(SystemExit):
     """Exit with a short message (no traceback)."""
+
+
+def colorize(text: str, color: str) -> str:
+    if not sys.stdout.isatty():
+        return text
+    return f"{color}{text}{_COLOR_RESET}"
+
+
+def print_target_branch(target: str) -> None:
+    """Last-line summary: develop → green, any other parent → orange."""
+    color = _COLOR_GREEN if target == "develop" else _COLOR_ORANGE
+    print(f"Target branch: {colorize(target, color)}")
 
 
 def run(cmd: list[str], *, check: bool = True) -> str:
@@ -170,13 +187,8 @@ class TargetResolution:
     deleted_intermediate: str | None = None
 
 
-def resolve_target(current: str, override: str | None) -> TargetResolution:
-    if override:
-        override = strip_ref(override)
-        if not remote_exists(override):
-            raise Fatal(f"Override target origin/{override} does not exist.")
-        return TargetResolution(override, "user override (--into)")
-
+def _head_checkout_pairs() -> list[tuple[str, str]]:
+    """Newest→oldest (from, to) pairs from `git reflog show HEAD` checkouts."""
     head_log = run(["git", "reflog", "show", "HEAD", "-80"], check=False)
     checkouts: list[tuple[str, str]] = []
     for line in head_log.splitlines():
@@ -189,83 +201,137 @@ def resolve_target(current: str, override: str | None) -> TargetResolution:
         frm, to = strip_ref(m.group("frm")), strip_ref(m.group("to"))
         if frm and to and frm != to:
             checkouts.append((frm, to))
+    return checkouts
 
-    # Step 2: walk HEAD reflog stack from current
+
+def _reflog_parent_chain(
+    current: str, checkouts: list[tuple[str, str]]
+) -> tuple[str | None, list[str]]:
+    """Return (immediate_parent, walk of ancestors including immediate).
+
+    Walk follows checkout edges through deleted/unusable stack branches so the
+    nearest surviving remote parent can still be found.
+    """
     immediate: str | None = None
     for frm, to in checkouts:
         if to == current and frm != current and not is_junk(frm):
             immediate = frm
             break
-    if immediate and is_usable_target(immediate, current):
-        return TargetResolution(immediate, "HEAD reflog (immediate parent)")
-    if immediate:
-        # Walk through deleted (or unusable) stack branches. Skip bounces
-        # back to the current branch (checkout A→B then B→A).
-        cursor = immediate
-        deleted = immediate if not remote_exists(immediate) else None
-        for frm, to in checkouts:
-            if to != cursor or is_junk(frm) or frm == cursor or frm == current:
-                continue
-            if is_usable_target(frm, current):
-                return TargetResolution(
-                    frm,
-                    "HEAD reflog (nearest surviving parent)",
-                    deleted_intermediate=deleted or immediate,
-                )
-            if not remote_exists(frm):
-                deleted = deleted or frm
-            cursor = frm
+    if not immediate:
+        return None, []
 
-    # Step 3: current-branch reflog
-    branch_log = run(["git", "reflog", "show", current, "-40"], check=False)
-    for line in branch_log.splitlines():
-        parent: str | None = None
-        m = CHECKOUT_RE.search(line)
-        if m and strip_ref(m.group("to")) == current:
-            parent = strip_ref(m.group("frm"))
-        else:
-            m2 = CREATED_FROM_RE.search(line)
-            if m2:
-                parent = strip_ref(m2.group("ref"))
-        if not parent or not is_usable_target(parent, current):
+    chain = [immediate]
+    cursor = immediate
+    for frm, to in checkouts:
+        if to != cursor or is_junk(frm) or frm == cursor or frm == current:
             continue
-        return TargetResolution(parent, "current-branch reflog")
+        chain.append(frm)
+        cursor = frm
+    return immediate, chain
 
-    # Step 4: nearest surviving feature ancestor from known stack bases
+
+def resolve_target(current: str, override: str | None) -> TargetResolution:
+    """Resolve PR base = parent of the current branch.
+
+    Parent means the branch this one was cut from (reflog), falling back to the
+    nearest surviving stack ancestor. When a stacked parent was already merged
+    into a trunk (e.g. develop has a smaller ahead than the old stack branch),
+    prefer that trunk — otherwise stacked leftovers become wrong PR targets.
+    """
+    if override:
+        override = strip_ref(override)
+        if not remote_exists(override):
+            raise Fatal(f"Override target origin/{override} does not exist.")
+        return TargetResolution(override, "user override (--into)")
+
+    checkouts = _head_checkout_pairs()
+    immediate, chain = _reflog_parent_chain(current, checkouts)
+    deleted_intermediate = (
+        immediate if immediate and not remote_exists(immediate) else None
+    )
+
+    # Step 2: HEAD reflog parent (immediate, else nearest surviving in chain).
+    reflog_parent: str | None = None
+    reflog_step = "HEAD reflog (immediate parent)"
+    for name in chain:
+        if is_usable_target(name, current):
+            reflog_parent = name
+            if name != immediate:
+                reflog_step = "HEAD reflog (nearest surviving parent)"
+            break
+
+    # Step 3: current-branch reflog ("Created from" / checkout onto current).
+    branch_parent: str | None = None
+    if reflog_parent is None:
+        branch_log = run(["git", "reflog", "show", current, "-40"], check=False)
+        for line in branch_log.splitlines():
+            parent: str | None = None
+            m = CHECKOUT_RE.search(line)
+            if m and strip_ref(m.group("to")) == current:
+                parent = strip_ref(m.group("frm"))
+            else:
+                m2 = CREATED_FROM_RE.search(line)
+                if m2:
+                    parent = strip_ref(m2.group("ref"))
+            if parent and is_usable_target(parent, current):
+                branch_parent = parent
+                break
+
+    preferred = reflog_parent or branch_parent
+
+    # Step 4/5: among preferred parent + other stack hints + trunks, pick the
+    # ancestor with the smallest ahead. This keeps true stacks (parent ahead=2,
+    # develop ahead=50 → parent) and fixes post-merge leftovers (develop ahead=1,
+    # old stack parent ahead=5 → develop).
     candidates: list[str] = []
+    if preferred:
+        candidates.append(preferred)
+
     missing_parent_task = parse_task_id(immediate) if immediate else None
     current_task = parse_task_id(current)
     for task in (missing_parent_task, current_task):
         if not task:
             continue
-        listing = run(["git", "branch", "-r", "--list", f"origin/{task}-*"], check=False)
+        listing = run(
+            ["git", "branch", "-r", "--list", f"origin/{task}-*"], check=False
+        )
         for line in listing.splitlines():
             name = strip_ref(line.strip())
             if is_usable_target(name, current):
                 candidates.append(name)
 
-    # known stack bases from HEAD reflog checkouts
     for frm, to in checkouts:
         for name in (frm, to):
-            if name in TRUNK_BRANCHES:
-                continue
-            if is_usable_target(name, current):
+            if name != current and is_usable_target(name, current):
                 candidates.append(name)
 
-    picked = _pick_best(
-        candidates, current, prefer_reflog_order=[frm for frm, _ in checkouts]
-    )
+    candidates.extend(TRUNK_BRANCHES)
+
+    prefer_order: list[str] = []
+    if preferred:
+        prefer_order.append(preferred)
+    prefer_order.extend(frm for frm, _ in checkouts)
+
+    picked = _pick_best(candidates, current, prefer_reflog_order=prefer_order)
     if picked:
+        if preferred and picked == preferred:
+            step = (
+                reflog_step
+                if reflog_parent
+                else "current-branch reflog"
+            )
+        elif picked in TRUNK_BRANCHES and preferred and preferred not in TRUNK_BRANCHES:
+            # Stack parent existed but trunk is closer to HEAD (already merged).
+            step = f"trunk ({picked}; closer than stack parent {preferred})"
+        elif picked in TRUNK_BRANCHES:
+            step = "trunk fallback"
+        else:
+            step = "nearest surviving feature ancestor"
         return TargetResolution(
             picked,
-            "nearest surviving feature ancestor",
-            deleted_intermediate=immediate if immediate and not remote_exists(immediate) else None,
+            step,
+            deleted_intermediate=deleted_intermediate,
         )
-
-    # Step 5: trunk fallback
-    trunk_pick = _pick_best(list(TRUNK_BRANCHES), current, prefer_reflog_order=[])
-    if trunk_pick:
-        return TargetResolution(trunk_pick, "trunk fallback")
 
     raise Fatal(
         "Could not resolve a remote parent/target branch. "
@@ -366,12 +432,17 @@ def ensure_pushed(current: str) -> None:
 
 
 # Goft (Mattermost) paste template. Keys filled from the created PR + Task.
+# {target_branch_line} is "\n\n{branch}" when base ≠ develop, else "".
 GOFT_TEMPLATE = (
     ":parking: [PR #{pr_id}   {pr_title}]({pr_url})\n"
     "\n"
-    ":large_yellow_square:  [Task #{task_id}]({task_url}) "
+    ":large_yellow_square:  [Task #{task_id}]({task_url})"
+    "{target_branch_line}"
 )
-GOFT_PR_ONLY_TEMPLATE = ":parking: [#{pr_id} {pr_title}]({pr_url})"
+GOFT_PR_ONLY_TEMPLATE = (
+    ":parking: [#{pr_id} {pr_title}]({pr_url})"
+    "{target_branch_line}"
+)
 
 
 @dataclass(frozen=True)
@@ -482,6 +553,13 @@ def build_title_and_description(
     return title, description
 
 
+def target_branch_line(target: str | None) -> str:
+    """Last Goft line with TARGET_BRANCH when base is not develop; else empty."""
+    if not target or target == "develop":
+        return ""
+    return f"\n\n{target}"
+
+
 def format_goft_blurb(
     *,
     pr_id: str | int,
@@ -490,21 +568,23 @@ def format_goft_blurb(
     task: WorkItemRef | None,
     fallback_task_title: str,
     task_id: str | None,
+    target: str | None = None,
 ) -> str:
-    """Fill GOFT_TEMPLATE from the created PR + Task."""
+    """Fill GOFT_TEMPLATE from the created PR + Task (+ TARGET_BRANCH if needed)."""
     display_pr_title = pr_title.strip()
     if task_id:
         display_pr_title = (
             strip_task_id_ref(display_pr_title, task_id) or display_pr_title
         )
-    pr_line = {
+    shared = {
         "pr_id": pr_id,
         "pr_title": display_pr_title,
         "pr_url": pr_url,
+        "target_branch_line": target_branch_line(target),
     }
     if task is not None:
         return GOFT_TEMPLATE.format(
-            **pr_line,
+            **shared,
             task_id=task.id,
             task_url=task.url,
             task_title=strip_task_id_ref(task.title, task.id),
@@ -519,12 +599,12 @@ def format_goft_blurb(
     base = base.strip()
     if task_id:
         return GOFT_TEMPLATE.format(
-            **pr_line,
+            **shared,
             task_id=task_id,
             task_url=work_item_url(task_id),
             task_title=base or fallback_task_title.strip(),
         )
-    return GOFT_PR_ONLY_TEMPLATE.format(**pr_line)
+    return GOFT_PR_ONLY_TEMPLATE.format(**shared)
 
 
 def copy_to_clipboard(text: str) -> bool:
@@ -628,6 +708,7 @@ def create_pr_flow(
         print("\n[dry-run] Would create PR with body:\n")
         print(description)
         print("[dry-run] Skipping create / reviewers / autocomplete / work item.")
+        print_target_branch(target)
         return
 
     if client is None:
@@ -805,6 +886,7 @@ def create_pr_flow(
         task=task_ref,
         fallback_task_title=title,
         task_id=task_id,
+        target=target,
     )
     print("\n--- Goft (cip_android) ---")
     print(goft_block)
@@ -817,6 +899,7 @@ def create_pr_flow(
             "(install wl-copy, xclip, or xsel).",
             file=sys.stderr,
         )
+    print_target_branch(target)
 
 
 def main(argv: list[str] | None = None) -> None:
